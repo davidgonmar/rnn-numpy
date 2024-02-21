@@ -2,6 +2,15 @@ import numpy as np
 from typing import Tuple
 
 
+class RNNBackwardState:
+    def __init__(self, rnn: "RNN"):
+        self.ww_grad = np.zeros_like(rnn.ww)
+        self.wv_grad = np.zeros_like(rnn.wv)
+        self.wu_grad = np.zeros_like(rnn.wu)
+        self.bh_grad = np.zeros_like(rnn.bh)
+        self.bo_grad = np.zeros_like(rnn.bo)
+
+
 class RNN:
     """A simple RNN implementation using numpy"""
 
@@ -102,10 +111,45 @@ class RNN:
         self.bh -= learning_rate * bh_grad
         self.bo -= learning_rate * bo_grad
 
+    def backward_step(
+        self,
+        st: RNNBackwardState,
+        hidden: np.ndarray,
+        prev_hidden: np.ndarray,
+        input: np.ndarray,
+        out_grad: np.ndarray,
+    ):
+        """
+        Performs a single backward step on the RNN model.
+        Modifies the gradients in the backward state.
+        Args:
+            st: The backward state
+            hidden: The hidden state. Shape = (batch_size, hidden_size)
+            prev_hidden: The previous hidden state. Shape = (batch_size, hidden_size)
+            input: The input sequence. Shape = (batch_size, input_size)
+            out_grad: The gradients of the output sequence. Shape = (batch_size, output_size)
+
+        Returns:
+            None
+
+        """
+        st.ww_grad += (hidden.T @ out_grad).T
+        st.bo_grad += np.mean(out_grad, axis=0)
+
+        h_grad = out_grad @ self.ww.T.T
+
+        # Backpropagate through the tanh
+        h_grad = h_grad * (1 - hidden**2)
+
+        st.wu_grad += (input.T @ h_grad).T
+
+        st.wv_grad += (prev_hidden.T @ h_grad).T
+
+        st.bh_grad += np.mean(h_grad, axis=0)
+
     def backward(
         self,
         preds: np.ndarray,
-        actuals: np.ndarray,
         hiddens: np.ndarray,
         inputs: np.ndarray,
         out_grads: np.ndarray,
@@ -132,27 +176,13 @@ class RNN:
             bo_grad: The gradient of the output bias. Shape = (output_size)
         """
 
-        ww_grad = np.zeros_like(self.ww)
-        wv_grad = np.zeros_like(self.wv)
-        wu_grad = np.zeros_like(self.wu)
-        bh_grad = np.zeros_like(self.bh)
-        bo_grad = np.zeros_like(self.bo)
+        st = RNNBackwardState(self)
 
         # Iterate in 'reverse time' for the backpropagation algorithm
         for i in reversed(range(len(preds))):
-            hi = hiddens[i]
+            hidden = hiddens[i]
             out_grad = out_grads[i]
-
-            ww_grad += (hi.T @ out_grad).T
-            bo_grad += np.mean(out_grad, axis=0)
-
-            h_grad = out_grad @ self.ww.T.T
-
-            # Backpropagate through the tanh
-            h_grad = h_grad * (1 - hi**2)
-
-            wu_grad += (inputs[i].T @ h_grad).T
-
+            input = inputs[i]
             if i != 0:
                 prev_hidden = hiddens[i - 1]
             else:
@@ -160,18 +190,19 @@ class RNN:
                     prev_hidden
                 )  # this was the first one on the forward pass.
 
-            wv_grad += (prev_hidden.T @ h_grad).T
+            self.backward_step(st, hidden, prev_hidden, input, out_grad)
 
-            bh_grad += np.mean(h_grad, axis=0)
-
-        assert wu_grad.shape == self.wu.shape
-        assert wv_grad.shape == self.wv.shape
-        assert ww_grad.shape == self.ww.shape
-        assert bh_grad.shape == self.bh.shape
-        assert bo_grad.shape == self.bo.shape
+        assert st.wu_grad.shape == self.wu.shape
+        assert st.wv_grad.shape == self.wv.shape
+        assert st.ww_grad.shape == self.ww.shape
+        assert st.bh_grad.shape == self.bh.shape
+        assert st.bo_grad.shape == self.bo.shape
 
         # Clip the gradients to prevent exploding gradients
-        for grad in [wu_grad, wv_grad, ww_grad, bh_grad, bo_grad]:
-            np.clip(grad, -1, 1, out=grad)
+        st.ww_grad = np.clip(st.ww_grad, -1, 1)
+        st.wv_grad = np.clip(st.wv_grad, -1, 1)
+        st.wu_grad = np.clip(st.wu_grad, -1, 1)
+        st.bh_grad = np.clip(st.bh_grad, -1, 1)
+        st.bo_grad = np.clip(st.bo_grad, -1, 1)
 
-        return ww_grad, wv_grad, wu_grad, bh_grad, bo_grad
+        return st.ww_grad, st.wv_grad, st.wu_grad, st.bh_grad, st.bo_grad
