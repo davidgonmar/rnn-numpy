@@ -15,8 +15,8 @@ class RNNForwardState:
         self.hiddens = []
         self.outputs = []
     
-    def get_current_outputs_and_hiddens(self):
-        return np.array(self.outputs), np.array(self.hiddens)
+    def get_current_outputs_and_hiddens(self, start_time: int = 0, end_time: int = None):
+        return np.array(self.outputs[start_time:end_time]), np.array(self.hiddens[start_time:end_time])
 
 class RNN:
     """A simple RNN implementation using numpy"""
@@ -212,7 +212,8 @@ class RNN:
         # Iterate in 'reverse time' for the backpropagation algorithm
         for i in reversed(range(start_time, end_time or len(preds))):
             hidden = hiddens[i]
-            out_grad = out_grads[i]
+            # out_grad is local, so it doesnt have lenght of seq_len, but of the truncated steps size
+            out_grad = out_grads[i - start_time]
             input = inputs[i]
             if i != 0:
                 prev_hidden = hiddens[i - 1]

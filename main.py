@@ -81,7 +81,8 @@ batch_size = 1000
 
 plt.ion()
 fig, ax = plt.subplots()
-
+fig2, ax2 = plt.subplots()
+losses = []
 
 def update_ax(input_seq, target_seq, preds, epoch):
     ax.clear()
@@ -97,6 +98,13 @@ def update_ax(input_seq, target_seq, preds, epoch):
     ax.plot(preds_x, preds, label="Predicted")
     ax.legend()
     ax.set_title(f"After Training Epoch: {epoch}")
+
+    # plot loss in a separate window
+    ax2.plot(losses)
+    ax2.set_title("Loss")
+
+    
+
     plt.pause(0.01)
 
 truncated_steps = 10 # The number of steps to backpropagate through time ()
@@ -111,17 +119,15 @@ for epoch in range(epochs):
         rnn.forward_step(fw_st, input_seq, t)
         if t % truncated_steps == truncated_steps - 1:
             preds, hiddens = fw_st.get_current_outputs_and_hiddens()
-            partial_target_seq = target_seq[t - truncated_steps + 1 : t + 1, :, :]
-            partial_preds = preds[t - truncated_steps + 1 : t + 1, :, :]
-            partial_hiddens = hiddens[t - truncated_steps + 1 : t + 1, :, :]
-            partial_input_seq = input_seq[t - truncated_steps + 1 : t + 1, :, :]
-            loss = mse(partial_preds, partial_target_seq)
-            out_grads = mse_bw(partial_preds, partial_target_seq)
+            loss = mse(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
+            out_grads = mse_bw(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
             ww_grad, wv_grad, wu_grad, bh_grad, bo_grad = rnn.truncated_backward(
-                partial_preds, partial_hiddens, partial_input_seq, out_grads, 0, truncated_steps
+                preds, hiddens, input_seq, out_grads, t - truncated_steps + 1, t + 1
             )
             learning_rate = 0.1 if epoch < 200 else 0.001
             rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
+            losses.append(loss)
+        
     print(f"Epoch: {epoch} Loss: {loss}")
 
     if epoch % 30 == 0:
