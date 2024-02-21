@@ -3,12 +3,13 @@ from typing import Tuple
 
 
 class RNNBackwardState:
-    def __init__(self, rnn: "RNN"):
+    def __init__(self, rnn: "RNN", seq_len: int, batch_size: int):
         self.ww_grad = np.zeros_like(rnn.ww)
         self.wv_grad = np.zeros_like(rnn.wv)
         self.wu_grad = np.zeros_like(rnn.wu)
         self.bh_grad = np.zeros_like(rnn.bh)
         self.bo_grad = np.zeros_like(rnn.bo)
+        self.input_grad = np.zeros((seq_len, batch_size, rnn.input_size))
 
 class RNNForwardState:
     def __init__(self):
@@ -160,12 +161,13 @@ class RNN:
 
         # Backpropagate through the tanh
         h_grad = h_grad * (1 - hidden**2)
-
         st.wu_grad += (input.T @ h_grad).T
 
         st.wv_grad += (prev_hidden.T @ h_grad).T
 
         st.bh_grad += np.mean(h_grad, axis=0)
+
+        st.input_grad += h_grad @ self.wu.T.T
     
     def backward(
         self,
@@ -208,7 +210,7 @@ class RNN:
             bo_grad: The gradient of the output bias. Shape = (output_size)
         """
 
-        st = RNNBackwardState(self)
+        st = RNNBackwardState(self, preds.shape[0], preds.shape[1])
         # Iterate in 'reverse time' for the backpropagation algorithm
         for i in reversed(range(start_time, end_time or len(preds))):
             hidden = hiddens[i]
@@ -228,6 +230,8 @@ class RNN:
         assert st.ww_grad.shape == self.ww.shape
         assert st.bh_grad.shape == self.bh.shape
         assert st.bo_grad.shape == self.bo.shape
+        partial_inputs_shape = (preds.shape[0], preds.shape[1], self.input_size) # since it is truncated, we need to return the partial inputs shape
+        assert st.input_grad.shape == partial_inputs_shape
 
         # Clip the gradients to prevent exploding gradients
         st.ww_grad = np.clip(st.ww_grad, -1, 1)
@@ -235,5 +239,6 @@ class RNN:
         st.wu_grad = np.clip(st.wu_grad, -1, 1)
         st.bh_grad = np.clip(st.bh_grad, -1, 1)
         st.bo_grad = np.clip(st.bo_grad, -1, 1)
+        st.input_grad = np.clip(st.input_grad, -1, 1)
 
-        return st.ww_grad, st.wv_grad, st.wu_grad, st.bh_grad, st.bo_grad
+        return st.ww_grad, st.wv_grad, st.wu_grad, st.bh_grad, st.bo_grad, st.input_grad

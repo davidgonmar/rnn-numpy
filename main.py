@@ -73,91 +73,203 @@ def mse_bw(preds: np.ndarray, actuals: np.ndarray) -> np.ndarray:
     return out
 
 
-rnn = RNN(input_size=1, hidden_size=5, output_size=1)
-epochs = 500
-seq_len = 30
-batch_size = 1000
-
-
-plt.ion()
-fig, ax = plt.subplots()
-fig2, ax2 = plt.subplots()
-losses = []
-
-def update_ax(input_seq, target_seq, preds, epoch):
-    ax.clear()
-    inputs = np.squeeze(input_seq[:, 0, :])
-    inputs_x = np.arange(0, len(inputs))
-    targets = np.squeeze(target_seq[:, 0, :])
-    targets_x = np.arange(len(inputs), len(targets) + len(inputs))
-    preds = np.squeeze(preds[:, 0, :])
-    preds_x = np.arange(len(inputs), len(targets) + len(inputs))
-
-    ax.plot(inputs_x, inputs, label="Input (Sine Wave)")
-    ax.plot(targets_x, targets, label="Target")
-    ax.plot(preds_x, preds, label="Predicted")
-    ax.legend()
-    ax.set_title(f"After Training Epoch: {epoch}")
-
-    # plot loss in a separate window
-    ax2.plot(losses)
-    ax2.set_title("Loss")
-
-    
-
-    plt.pause(0.01)
-
-truncated_steps = 10 # The number of steps to backpropagate through time ()
-assert seq_len % truncated_steps == 0, "seq_len must be divisible by truncated_steps"
-
-for epoch in range(epochs):
-    input_seq, target_seq = generate_sine_wave_sequences(seq_len, batch_size)
-
-    fw_st = RNNForwardState()
-    for t in range(seq_len):
-        partial_input_seq = input_seq[t, :, :]
-        rnn.forward_step(fw_st, input_seq, t)
-        if t % truncated_steps == truncated_steps - 1:
-            preds, hiddens = fw_st.get_current_outputs_and_hiddens()
-            loss = mse(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
-            out_grads = mse_bw(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
-            ww_grad, wv_grad, wu_grad, bh_grad, bo_grad = rnn.truncated_backward(
-                preds, hiddens, input_seq, out_grads, t - truncated_steps + 1, t + 1
-            )
-            learning_rate = 0.1 if epoch < 200 else 0.001
-            rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
-            losses.append(loss)
+if __name__ == "__main__":
+    import argparse
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("--single", action="store_true")
+    args = arg_parser.parse_args()
+    if not args.single:
         
-    print(f"Epoch: {epoch} Loss: {loss}")
-
-    if epoch % 30 == 0:
-        update_ax(input_seq, target_seq, preds, epoch)
-
-
-sequences = [generate_sine_wave_sequences(seq_len, batch_size) for _ in range(3)]
+        rnn = RNN(input_size=1, hidden_size=5, output_size=1)
+        rnn2 = RNN(input_size=1, hidden_size=5, output_size=1)
+        epochs = 500
+        seq_len = 30
+        batch_size = 1000
 
 
-fig, axes = plt.subplots(3, 1, figsize=(5, 10))
-plt.ioff()
+        plt.ion()
+        fig, ax = plt.subplots()
+        fig2, ax2 = plt.subplots()
+        losses = []
 
-for i, (input_seq, target_seq) in enumerate(sequences):
-    preds, _ = rnn.forward(input_seq)
+        def update_ax(input_seq, target_seq, preds, epoch):
+            ax.clear()
+            inputs = np.squeeze(input_seq[:, 0, :])
+            inputs_x = np.arange(0, len(inputs))
+            targets = np.squeeze(target_seq[:, 0, :])
+            targets_x = np.arange(len(inputs), len(targets) + len(inputs))
+            preds = np.squeeze(preds[:, 0, :])
+            preds_x = np.arange(len(inputs), len(targets) + len(inputs))
 
-    inputs = np.squeeze(input_seq[:, 0, :])
-    inputs_x = np.arange(0, len(inputs))
+            ax.plot(inputs_x, inputs, label="Input (Sine Wave)")
+            ax.plot(targets_x, targets, label="Target")
+            ax.plot(preds_x, preds, label="Predicted")
+            ax.legend()
+            ax.set_title(f"After Training Epoch: {epoch}")
 
-    targets = np.squeeze(target_seq[:, 0, :])
-    targets_x = np.arange(len(inputs), 2 * len(inputs))
+            # plot loss in a separate window
+            ax2.plot(losses)
+            ax2.set_title("Loss")
 
-    preds = np.squeeze(preds[:, 0, :])
-    preds_x = np.arange(len(inputs), 2 * len(inputs))
 
-    # Plot on the i-th subplot
-    axes[i].plot(inputs_x, inputs, label="Input (Sine Wave)")
-    axes[i].plot(targets_x, targets, label="Target")
-    axes[i].plot(preds_x, preds, label="Predicted")
-    axes[i].legend()
-    axes[i].set_title(f"Sequence {i+1} After Training")
 
-plt.tight_layout()
-plt.show()
+            plt.pause(0.01)
+
+        truncated_steps = 5 # The number of steps to backpropagate through time ()
+        assert seq_len % truncated_steps == 0, "seq_len must be divisible by truncated_steps"
+
+        for epoch in range(epochs):
+            input_seq, target_seq = generate_sine_wave_sequences(seq_len, batch_size)
+
+            fw_st = RNNForwardState()
+            fw_st2 = RNNForwardState()
+            avg_loss = 0
+            for t in range(seq_len):
+                partial_input_seq = input_seq[t, :, :]
+                rnn.forward_step(fw_st, input_seq, t)
+                rnn2.forward_step(fw_st2, fw_st.get_current_outputs_and_hiddens()[0], t)
+                if t % truncated_steps == truncated_steps - 1:
+                    preds, hiddens = fw_st2.get_current_outputs_and_hiddens()
+                    loss = mse(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
+                    out_grads = mse_bw(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
+                    ww_grad, wv_grad, wu_grad, bh_grad, bo_grad, inputs_grad = rnn.truncated_backward(
+                        preds, hiddens, input_seq, out_grads, t - truncated_steps + 1, t + 1
+                    )
+                    ww_grad2, wv_grad2, wu_grad2, bh_grad2, bo_grad2, inputs_grad2 = rnn2.truncated_backward(
+                        preds, hiddens, fw_st.get_current_outputs_and_hiddens()[0], out_grads, t - truncated_steps + 1, t + 1
+                    )
+                    learning_rate = 0.1 if epoch < 200 else 0.001
+                    rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
+                    rnn2.update_parameters(learning_rate, ww_grad2, wv_grad2, wu_grad2, bh_grad2, bo_grad2)
+                    avg_loss += loss
+            
+            losses.append(avg_loss / seq_len)
+                
+            print(f"Epoch: {epoch} Loss: {avg_loss / seq_len}")
+
+            if epoch % 30 == 0:
+                update_ax(input_seq, target_seq, preds, epoch)
+
+
+        sequences = [generate_sine_wave_sequences(seq_len, batch_size) for _ in range(3)]
+
+
+        fig, axes = plt.subplots(3, 1, figsize=(5, 10))
+        plt.ioff()
+
+        for i, (input_seq, target_seq) in enumerate(sequences):
+            preds, _ = rnn.forward(input_seq)
+
+            inputs = np.squeeze(input_seq[:, 0, :])
+            inputs_x = np.arange(0, len(inputs))
+
+            targets = np.squeeze(target_seq[:, 0, :])
+            targets_x = np.arange(len(inputs), 2 * len(inputs))
+
+            preds = np.squeeze(preds[:, 0, :])
+            preds_x = np.arange(len(inputs), 2 * len(inputs))
+
+            # Plot on the i-th subplot
+            axes[i].plot(inputs_x, inputs, label="Input (Sine Wave)")
+            axes[i].plot(targets_x, targets, label="Target")
+            axes[i].plot(preds_x, preds, label="Predicted")
+            axes[i].legend()
+            axes[i].set_title(f"Sequence {i+1} After Training")
+
+        plt.tight_layout()
+        plt.show()
+    else:
+       
+        rnn = RNN(input_size=1, hidden_size=5, output_size=1)
+        epochs = 500
+        seq_len = 30
+        batch_size = 1000
+
+
+        plt.ion()
+        fig, ax = plt.subplots()
+        fig2, ax2 = plt.subplots()
+        losses = []
+
+        def update_ax(input_seq, target_seq, preds, epoch):
+            ax.clear()
+            inputs = np.squeeze(input_seq[:, 0, :])
+            inputs_x = np.arange(0, len(inputs))
+            targets = np.squeeze(target_seq[:, 0, :])
+            targets_x = np.arange(len(inputs), len(targets) + len(inputs))
+            preds = np.squeeze(preds[:, 0, :])
+            preds_x = np.arange(len(inputs), len(targets) + len(inputs))
+
+            ax.plot(inputs_x, inputs, label="Input (Sine Wave)")
+            ax.plot(targets_x, targets, label="Target")
+            ax.plot(preds_x, preds, label="Predicted")
+            ax.legend()
+            ax.set_title(f"After Training Epoch: {epoch}")
+
+            # plot loss in a separate window
+            ax2.plot(losses)
+            ax2.set_title("Loss")
+
+
+
+            plt.pause(0.01)
+
+        truncated_steps = 5 # The number of steps to backpropagate through time ()
+        assert seq_len % truncated_steps == 0, "seq_len must be divisible by truncated_steps"
+
+        for epoch in range(epochs):
+            input_seq, target_seq = generate_sine_wave_sequences(seq_len, batch_size)
+
+            fw_st = RNNForwardState()
+            avg_loss = 0
+            for t in range(seq_len):
+                partial_input_seq = input_seq[t, :, :]
+                rnn.forward_step(fw_st, input_seq, t)
+
+                if t % truncated_steps == truncated_steps - 1:
+                    preds, hiddens = fw_st.get_current_outputs_and_hiddens()
+                    loss = mse(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
+                    out_grads = mse_bw(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
+                    ww_grad, wv_grad, wu_grad, bh_grad, bo_grad, inputs_grad = rnn.truncated_backward(
+                        preds, hiddens, input_seq, out_grads, t - truncated_steps + 1, t + 1
+                    )
+                    learning_rate = 0.1 if epoch < 200 else 0.001
+                    rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
+
+                    avg_loss += loss
+            
+            losses.append(avg_loss / seq_len)
+                
+            print(f"Epoch: {epoch} Loss: {avg_loss / seq_len}")
+
+            if epoch % 30 == 0:
+                update_ax(input_seq, target_seq, preds, epoch)
+
+
+        sequences = [generate_sine_wave_sequences(seq_len, batch_size) for _ in range(3)]
+
+
+        fig, axes = plt.subplots(3, 1, figsize=(5, 10))
+        plt.ioff()
+
+        for i, (input_seq, target_seq) in enumerate(sequences):
+            preds, _ = rnn.forward(input_seq)
+
+            inputs = np.squeeze(input_seq[:, 0, :])
+            inputs_x = np.arange(0, len(inputs))
+
+            targets = np.squeeze(target_seq[:, 0, :])
+            targets_x = np.arange(len(inputs), 2 * len(inputs))
+
+            preds = np.squeeze(preds[:, 0, :])
+            preds_x = np.arange(len(inputs), 2 * len(inputs))
+
+            # Plot on the i-th subplot
+            axes[i].plot(inputs_x, inputs, label="Input (Sine Wave)")
+            axes[i].plot(targets_x, targets, label="Target")
+            axes[i].plot(preds_x, preds, label="Predicted")
+            axes[i].legend()
+            axes[i].set_title(f"Sequence {i+1} After Training")
+
+        plt.tight_layout()
+        plt.show()
