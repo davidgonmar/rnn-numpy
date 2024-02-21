@@ -110,7 +110,7 @@ for epoch in range(epochs):
     out_grads = mse_bw(preds, target_seq)
 
     ww_grad, wv_grad, wu_grad, bh_grad, bo_grad = rnn.backward(
-        preds, hiddens, input_seq, out_grads
+        preds,  hiddens, input_seq, out_grads
     )
     learning_rate = 0.1 if epoch < 200 else 0.001
     rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)

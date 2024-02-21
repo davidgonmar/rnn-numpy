@@ -10,6 +10,10 @@ class RNNBackwardState:
         self.bh_grad = np.zeros_like(rnn.bh)
         self.bo_grad = np.zeros_like(rnn.bo)
 
+class RNNForwardState:
+    def __init__(self):
+        self.hiddens = []
+        self.outputs = []
 
 class RNN:
     """A simple RNN implementation using numpy"""
@@ -45,7 +49,7 @@ class RNN:
         self.bh = np.zeros((hidden_size))
         self.bo = np.zeros((output_size))
 
-    def forward(self, inputs: np.array) -> Tuple[np.array, np.array]:
+    def forward_step(self, st: RNNForwardState, inputs: np.array, time: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         Performs a forward pass on the RNN model.
         Inputs must be batched and have the shape (seq_len, batch_size, input_size), even if batch_size = 1
@@ -67,21 +71,34 @@ class RNN:
             input_size
         )
 
-        hiddens = []
-        outputs = []
-
         # Initialize the first hidden layer as 0s
-        prev_h = np.zeros((batch_size, self.hidden_size))
+        prev_h = np.zeros((batch_size, self.hidden_size)) if time == 0 else st.hiddens[-1]
+        x_t = inputs[time]
+        h = x_t @ self.wu.T + prev_h @ self.wv.T + self.bh
+        h = np.tanh(h)
+        o = h @ self.ww.T + self.bo
+        st.outputs.append(o)
+        st.hiddens.append(h)
 
-        for x_t in inputs:
-            h = x_t @ self.wu.T + prev_h @ self.wv.T + self.bh
-            h = np.tanh(h)
-            o = h @ self.ww.T + self.bo
-            prev_h = h
-            outputs.append(o)
-            hiddens.append(h)
+    def forward(self, inputs: np.array) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Performs a forward pass on the RNN model.
+        Inputs must be batched and have the shape (seq_len, batch_size, input_size), even if batch_size = 1
+        and seq_len = 1. seq_len and batch_size denote the sequence length and batch size respectively, and
+        can be of any size. input_size is the size of the input vector, and must match the input_size parameter
+        of the model.
 
-        return np.array(outputs), np.array(hiddens)
+        Args:
+            inputs: The input sequence. Shape = (seq_len, batch_size, input_size)
+
+        Returns:
+            outputs: The output sequence. Shape = (seq_len, batch_size, output_size)
+            hiddens: The hidden states. Shape = (seq_len, batch_size, hidden_size)
+        """
+        st = RNNForwardState()
+        for t in range(len(inputs)):
+            self.forward_step(st, inputs, t)
+        return np.array(st.outputs), np.array(st.hiddens)
 
     def update_parameters(
         self,
@@ -146,13 +163,25 @@ class RNN:
         st.wv_grad += (prev_hidden.T @ h_grad).T
 
         st.bh_grad += np.mean(h_grad, axis=0)
-
+    
     def backward(
         self,
         preds: np.ndarray,
         hiddens: np.ndarray,
         inputs: np.ndarray,
         out_grads: np.ndarray,
+
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        return self.truncated_backward(preds, hiddens, inputs, out_grads, 0, None)
+
+    def truncated_backward(
+        self,
+        preds: np.ndarray,
+        hiddens: np.ndarray,
+        inputs: np.ndarray,
+        out_grads: np.ndarray,
+        start_time: int = 0,
+        end_time: int = None,
     ):
         """
         Performs a backward pass on the RNN model. preds denote the outputs of the model, actuals denote the
@@ -179,7 +208,7 @@ class RNN:
         st = RNNBackwardState(self)
 
         # Iterate in 'reverse time' for the backpropagation algorithm
-        for i in reversed(range(len(preds))):
+        for i in reversed(range(start_time, end_time or len(preds))):
             hidden = hiddens[i]
             out_grad = out_grads[i]
             input = inputs[i]
