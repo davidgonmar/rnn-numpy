@@ -14,6 +14,9 @@ class RNNForwardState:
     def __init__(self):
         self.hiddens = []
         self.outputs = []
+    
+    def get_current_outputs_and_hiddens(self):
+        return np.array(self.outputs), np.array(self.hiddens)
 
 class RNN:
     """A simple RNN implementation using numpy"""
@@ -206,7 +209,6 @@ class RNN:
         """
 
         st = RNNBackwardState(self)
-
         # Iterate in 'reverse time' for the backpropagation algorithm
         for i in reversed(range(start_time, end_time or len(preds))):
             hidden = hiddens[i]
@@ -216,9 +218,8 @@ class RNN:
                 prev_hidden = hiddens[i - 1]
             else:
                 prev_hidden = np.zeros_like(
-                    prev_hidden
+                    hidden
                 )  # this was the first one on the forward pass.
-
             self.backward_step(st, hidden, prev_hidden, input, out_grad)
 
         assert st.wu_grad.shape == self.wu.shape

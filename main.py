@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from rnn import RNN
+from rnn import RNN, RNNForwardState
 from typing import Tuple
 
 
@@ -99,21 +99,29 @@ def update_ax(input_seq, target_seq, preds, epoch):
     ax.set_title(f"After Training Epoch: {epoch}")
     plt.pause(0.01)
 
+truncated_steps = 10 # The number of steps to backpropagate through time ()
+assert seq_len % truncated_steps == 0, "seq_len must be divisible by truncated_steps"
 
 for epoch in range(epochs):
     input_seq, target_seq = generate_sine_wave_sequences(seq_len, batch_size)
 
-    preds, hiddens = rnn.forward(input_seq)
-
-    loss = mse(preds, target_seq)
-
-    out_grads = mse_bw(preds, target_seq)
-
-    ww_grad, wv_grad, wu_grad, bh_grad, bo_grad = rnn.backward(
-        preds,  hiddens, input_seq, out_grads
-    )
-    learning_rate = 0.1 if epoch < 200 else 0.001
-    rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
+    fw_st = RNNForwardState()
+    for t in range(seq_len):
+        partial_input_seq = input_seq[t, :, :]
+        rnn.forward_step(fw_st, input_seq, t)
+        if t % truncated_steps == truncated_steps - 1:
+            preds, hiddens = fw_st.get_current_outputs_and_hiddens()
+            partial_target_seq = target_seq[t - truncated_steps + 1 : t + 1, :, :]
+            partial_preds = preds[t - truncated_steps + 1 : t + 1, :, :]
+            partial_hiddens = hiddens[t - truncated_steps + 1 : t + 1, :, :]
+            partial_input_seq = input_seq[t - truncated_steps + 1 : t + 1, :, :]
+            loss = mse(partial_preds, partial_target_seq)
+            out_grads = mse_bw(partial_preds, partial_target_seq)
+            ww_grad, wv_grad, wu_grad, bh_grad, bo_grad = rnn.truncated_backward(
+                partial_preds, partial_hiddens, partial_input_seq, out_grads, 0, truncated_steps
+            )
+            learning_rate = 0.1 if epoch < 200 else 0.001
+            rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
     print(f"Epoch: {epoch} Loss: {loss}")
 
     if epoch % 30 == 0:
