@@ -75,17 +75,16 @@ def mse_bw(preds: np.ndarray, actuals: np.ndarray) -> np.ndarray:
 
 if __name__ == "__main__":
     import argparse
+
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("--single", action="store_true")
     args = arg_parser.parse_args()
     if not args.single:
-        
         rnn = RNN(input_size=1, hidden_size=5, output_size=1)
         rnn2 = RNN(input_size=1, hidden_size=5, output_size=1)
         epochs = 500
         seq_len = 30
         batch_size = 1000
-
 
         plt.ion()
         fig, ax = plt.subplots()
@@ -111,12 +110,12 @@ if __name__ == "__main__":
             ax2.plot(losses)
             ax2.set_title("Loss")
 
-
-
             plt.pause(0.01)
 
-        truncated_steps = 5 # The number of steps to backpropagate through time ()
-        assert seq_len % truncated_steps == 0, "seq_len must be divisible by truncated_steps"
+        truncated_steps = 5  # The number of steps to backpropagate through time ()
+        assert (
+            seq_len % truncated_steps == 0
+        ), "seq_len must be divisible by truncated_steps"
 
         for epoch in range(epochs):
             input_seq, target_seq = generate_sine_wave_sequences(seq_len, batch_size)
@@ -130,29 +129,63 @@ if __name__ == "__main__":
                 rnn2.forward_step(fw_st2, fw_st.get_current_outputs_and_hiddens()[0], t)
                 if t % truncated_steps == truncated_steps - 1:
                     preds, hiddens = fw_st2.get_current_outputs_and_hiddens()
-                    loss = mse(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
-                    out_grads = mse_bw(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
-                    ww_grad, wv_grad, wu_grad, bh_grad, bo_grad, inputs_grad = rnn.truncated_backward(
-                        preds, hiddens, input_seq, out_grads, t - truncated_steps + 1, t + 1
+                    loss = mse(
+                        preds[t - truncated_steps + 1 : t + 1, :, :],
+                        target_seq[t - truncated_steps + 1 : t + 1, :, :],
                     )
-                    ww_grad2, wv_grad2, wu_grad2, bh_grad2, bo_grad2, inputs_grad2 = rnn2.truncated_backward(
-                        preds, hiddens, fw_st.get_current_outputs_and_hiddens()[0], out_grads, t - truncated_steps + 1, t + 1
+                    out_grads = mse_bw(
+                        preds[t - truncated_steps + 1 : t + 1, :, :],
+                        target_seq[t - truncated_steps + 1 : t + 1, :, :],
+                    )
+                    (
+                        ww_grad,
+                        wv_grad,
+                        wu_grad,
+                        bh_grad,
+                        bo_grad,
+                        inputs_grad,
+                    ) = rnn.truncated_backward(
+                        preds,
+                        hiddens,
+                        input_seq,
+                        out_grads,
+                        t - truncated_steps + 1,
+                        t + 1,
+                    )
+                    (
+                        ww_grad2,
+                        wv_grad2,
+                        wu_grad2,
+                        bh_grad2,
+                        bo_grad2,
+                        inputs_grad2,
+                    ) = rnn2.truncated_backward(
+                        preds,
+                        hiddens,
+                        fw_st.get_current_outputs_and_hiddens()[0],
+                        out_grads,
+                        t - truncated_steps + 1,
+                        t + 1,
                     )
                     learning_rate = 0.1 if epoch < 200 else 0.001
-                    rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
-                    rnn2.update_parameters(learning_rate, ww_grad2, wv_grad2, wu_grad2, bh_grad2, bo_grad2)
+                    rnn.update_parameters(
+                        learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad
+                    )
+                    rnn2.update_parameters(
+                        learning_rate, ww_grad2, wv_grad2, wu_grad2, bh_grad2, bo_grad2
+                    )
                     avg_loss += loss
-            
+
             losses.append(avg_loss / seq_len)
-                
+
             print(f"Epoch: {epoch} Loss: {avg_loss / seq_len}")
 
             if epoch % 30 == 0:
                 update_ax(input_seq, target_seq, preds, epoch)
 
-
-        sequences = [generate_sine_wave_sequences(seq_len, batch_size) for _ in range(3)]
-
+        sequences = [
+            generate_sine_wave_sequences(seq_len, batch_size) for _ in range(3)
+        ]
 
         fig, axes = plt.subplots(3, 1, figsize=(5, 10))
         plt.ioff()
@@ -179,12 +212,10 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.show()
     else:
-       
         rnn = RNN(input_size=1, hidden_size=5, output_size=1)
         epochs = 500
         seq_len = 30
         batch_size = 1000
-
 
         plt.ion()
         fig, ax = plt.subplots()
@@ -210,12 +241,12 @@ if __name__ == "__main__":
             ax2.plot(losses)
             ax2.set_title("Loss")
 
-
-
             plt.pause(0.01)
 
-        truncated_steps = 5 # The number of steps to backpropagate through time ()
-        assert seq_len % truncated_steps == 0, "seq_len must be divisible by truncated_steps"
+        truncated_steps = 5  # The number of steps to backpropagate through time ()
+        assert (
+            seq_len % truncated_steps == 0
+        ), "seq_len must be divisible by truncated_steps"
 
         for epoch in range(epochs):
             input_seq, target_seq = generate_sine_wave_sequences(seq_len, batch_size)
@@ -228,26 +259,46 @@ if __name__ == "__main__":
 
                 if t % truncated_steps == truncated_steps - 1:
                     preds, hiddens = fw_st.get_current_outputs_and_hiddens()
-                    loss = mse(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
-                    out_grads = mse_bw(preds[t - truncated_steps + 1 : t + 1, :, :], target_seq[t - truncated_steps + 1 : t + 1, :, :])
-                    ww_grad, wv_grad, wu_grad, bh_grad, bo_grad, inputs_grad = rnn.truncated_backward(
-                        preds, hiddens, input_seq, out_grads, t - truncated_steps + 1, t + 1
+                    loss = mse(
+                        preds[t - truncated_steps + 1 : t + 1, :, :],
+                        target_seq[t - truncated_steps + 1 : t + 1, :, :],
+                    )
+                    out_grads = mse_bw(
+                        preds[t - truncated_steps + 1 : t + 1, :, :],
+                        target_seq[t - truncated_steps + 1 : t + 1, :, :],
+                    )
+                    (
+                        ww_grad,
+                        wv_grad,
+                        wu_grad,
+                        bh_grad,
+                        bo_grad,
+                        inputs_grad,
+                    ) = rnn.truncated_backward(
+                        preds,
+                        hiddens,
+                        input_seq,
+                        out_grads,
+                        t - truncated_steps + 1,
+                        t + 1,
                     )
                     learning_rate = 0.1 if epoch < 200 else 0.001
-                    rnn.update_parameters(learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad)
+                    rnn.update_parameters(
+                        learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad
+                    )
 
                     avg_loss += loss
-            
+
             losses.append(avg_loss / seq_len)
-                
+
             print(f"Epoch: {epoch} Loss: {avg_loss / seq_len}")
 
             if epoch % 30 == 0:
                 update_ax(input_seq, target_seq, preds, epoch)
 
-
-        sequences = [generate_sine_wave_sequences(seq_len, batch_size) for _ in range(3)]
-
+        sequences = [
+            generate_sine_wave_sequences(seq_len, batch_size) for _ in range(3)
+        ]
 
         fig, axes = plt.subplots(3, 1, figsize=(5, 10))
         plt.ioff()

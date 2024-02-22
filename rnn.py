@@ -11,13 +11,19 @@ class RNNBackwardState:
         self.bo_grad = np.zeros_like(rnn.bo)
         self.input_grad = np.zeros((seq_len, batch_size, rnn.input_size))
 
+
 class RNNForwardState:
     def __init__(self):
         self.hiddens = []
         self.outputs = []
-    
-    def get_current_outputs_and_hiddens(self, start_time: int = 0, end_time: int = None):
-        return np.array(self.outputs[start_time:end_time]), np.array(self.hiddens[start_time:end_time])
+
+    def get_current_outputs_and_hiddens(
+        self, start_time: int = 0, end_time: int = None
+    ):
+        return np.array(self.outputs[start_time:end_time]), np.array(
+            self.hiddens[start_time:end_time]
+        )
+
 
 class RNN:
     """A simple RNN implementation using numpy"""
@@ -53,7 +59,9 @@ class RNN:
         self.bh = np.zeros((hidden_size))
         self.bo = np.zeros((output_size))
 
-    def forward_step(self, st: RNNForwardState, inputs: np.array, time: int) -> Tuple[np.ndarray, np.ndarray]:
+    def forward_step(
+        self, st: RNNForwardState, inputs: np.array, time: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Performs a forward pass on the RNN model.
         Inputs must be batched and have the shape (seq_len, batch_size, input_size), even if batch_size = 1
@@ -76,7 +84,9 @@ class RNN:
         )
 
         # Initialize the first hidden layer as 0s
-        prev_h = np.zeros((batch_size, self.hidden_size)) if time == 0 else st.hiddens[-1]
+        prev_h = (
+            np.zeros((batch_size, self.hidden_size)) if time == 0 else st.hiddens[-1]
+        )
         x_t = inputs[time]
         h = x_t @ self.wu.T + prev_h @ self.wv.T + self.bh
         h = np.tanh(h)
@@ -168,14 +178,13 @@ class RNN:
         st.bh_grad += np.mean(h_grad, axis=0)
 
         st.input_grad += h_grad @ self.wu.T.T
-    
+
     def backward(
         self,
         preds: np.ndarray,
         hiddens: np.ndarray,
         inputs: np.ndarray,
         out_grads: np.ndarray,
-
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return self.truncated_backward(preds, hiddens, inputs, out_grads, 0, None)
 
@@ -230,7 +239,11 @@ class RNN:
         assert st.ww_grad.shape == self.ww.shape
         assert st.bh_grad.shape == self.bh.shape
         assert st.bo_grad.shape == self.bo.shape
-        partial_inputs_shape = (preds.shape[0], preds.shape[1], self.input_size) # since it is truncated, we need to return the partial inputs shape
+        partial_inputs_shape = (
+            preds.shape[0],
+            preds.shape[1],
+            self.input_size,
+        )  # since it is truncated, we need to return the partial inputs shape
         assert st.input_grad.shape == partial_inputs_shape
 
         # Clip the gradients to prevent exploding gradients
