@@ -33,6 +33,15 @@ truncated backpropagation through time was used to train the model.
 For the names, the model achieves a decent top-3 performance (given that name nationalities can sometimes be ambiguous even for humans,
 it's better to judge the model by its top-k performance rather than its accuracy).
 
+## Requirements
+
+The code was developed using Python 3.11.5.
+The required packages can be found in the `requirements.txt` file.
+
+```bash
+pip install -r requirements.txt
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
