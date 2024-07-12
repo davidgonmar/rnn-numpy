@@ -8,7 +8,7 @@ from rnn import RNNForwardState, RNN, RNNBackwardState
 import matplotlib.pyplot as plt
 
 
-# to run this, you must download the data from https://download.pytorch.org/tutorial/data.zip and put
+# To run this, you must download the data from https://download.pytorch.org/tutorial/data.zip and put
 # it in the ./data/names folder
 def cross_entropy_loss(preds: np.ndarray, actuals: np.ndarray) -> float:
     """
@@ -85,7 +85,7 @@ def untokenize_names(names: List[np.ndarray]):
 
 tokenized_names = {na: tokenize_names(li) for na, li in names.items()}
 
-iters = 100000
+iters = 300000
 
 class_to_idx = {na: i for i, na in enumerate(tokenized_names.keys())}
 idx_to_class = {i: na for i, na in enumerate(tokenized_names.keys())}
@@ -98,6 +98,10 @@ def get_random_sample():
     random_class = np.random.choice(list(tokenized_names.keys()))
     random_name = np.random.choice(tokenized_names[random_class])
     return class_to_idx[random_class], random_name
+
+
+def lr(step: int) -> float:
+    return 0.01 / (1 + 0.005 * (step / 100))
 
 
 losses = []
@@ -114,7 +118,7 @@ for iter in range(iters):
 
     loss = cross_entropy_loss(preds, target_class_oh)
     last_avg_loss += loss
-    if iter % 100 == 0:
+    if iter % 1000 == 0:
         print(f"iter {iter} loss: {loss/100}")
         losses.append(last_avg_loss / 100)
         last_avg_loss = 0
@@ -135,7 +139,12 @@ for iter in range(iters):
         rnn.backward_step(bw_st, hidden, prev_hidden, input_name[t], out_grad)
 
     rnn.update_parameters(
-        0.01, bw_st.ww_grad, bw_st.wv_grad, bw_st.wu_grad, bw_st.bh_grad, bw_st.bo_grad
+        lr(iter),
+        bw_st.ww_grad,
+        bw_st.wv_grad,
+        bw_st.wu_grad,
+        bw_st.bh_grad,
+        bw_st.bo_grad,
     )
 
 
@@ -147,6 +156,10 @@ while True:
     name = name.reshape(name.shape[0], 1, name.shape[1])
     preds, _ = rnn.forward(name)
     preds = preds[-1][0]
-    idx = np.argmax(preds)
 
-    print(f"Predicted {idx_to_class[idx]}")
+    # softmax
+    preds = np.exp(preds - np.max(preds)) / np.sum(np.exp(preds - np.max(preds)))
+    top3 = np.argsort(preds)[-3:][::-1]
+
+    for i in top3:
+        print(f"predicted {idx_to_class[i]}: {preds[i]}")

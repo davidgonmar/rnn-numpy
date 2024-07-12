@@ -73,6 +73,10 @@ def mse_bw(preds: np.ndarray, actuals: np.ndarray) -> np.ndarray:
     return out
 
 
+def lr(step: int) -> float:
+    return 0.01 / (1 + 0.01 * (step / 3))
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -82,7 +86,7 @@ if __name__ == "__main__":
     if not args.single:
         rnn = RNN(input_size=1, hidden_size=5, output_size=1)
         rnn2 = RNN(input_size=1, hidden_size=5, output_size=1)
-        epochs = 500
+        epochs = 5000
         seq_len = 30
         batch_size = 1000
 
@@ -167,7 +171,7 @@ if __name__ == "__main__":
                         t - truncated_steps + 1,
                         t + 1,
                     )
-                    learning_rate = 0.1 if epoch < 200 else 0.001
+                    learning_rate = lr(epoch)
                     rnn.update_parameters(
                         learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad
                     )
@@ -213,7 +217,7 @@ if __name__ == "__main__":
         plt.show()
     else:
         rnn = RNN(input_size=1, hidden_size=5, output_size=1)
-        epochs = 500
+        epochs = 5000
         seq_len = 30
         batch_size = 1000
 
@@ -282,7 +286,8 @@ if __name__ == "__main__":
                         t - truncated_steps + 1,
                         t + 1,
                     )
-                    learning_rate = 0.1 if epoch < 200 else 0.001
+
+                    learning_rate = lr(epoch)
                     rnn.update_parameters(
                         learning_rate, ww_grad, wv_grad, wu_grad, bh_grad, bo_grad
                     )

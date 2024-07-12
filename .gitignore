@@ -1,3 +1,4 @@
 data
 ignored
 __pycache__
+.ruff_cache
